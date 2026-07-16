@@ -1,0 +1,50 @@
+/* Import Google Fonts แบบเดียวกับไฟล์ HTML เดิม */
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ตั้งค่า Default Font ให้เหมือนเดิม */
+body {
+  font-family: 'Sarabun', sans-serif;
+  background-color: #f0f2f5;
+  color: #334155;
+}
+
+/* --- PRINT STYLES --- */
+@media print {
+  /* ซ่อนทุกอย่างในหน้าเว็บ */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* แสดงเฉพาะส่วนที่เป็นเอกสาร (id="print-content") */
+  #print-content, #print-content * {
+    visibility: visible;
+  }
+
+  /* จัดตำแหน่งให้เอกสารอยู่มุมซ้ายบนของกระดาษ */
+  #print-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  /* ซ่อนปุ่มต่างๆ ในหน้า Preview เวลาพิมพ์ */
+  .no-print {
+    display: none !important;
+  }
+  
+  /* บังคับขนาดหน้ากระดาษ (Optional) */
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
