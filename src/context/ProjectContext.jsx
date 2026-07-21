@@ -419,6 +419,21 @@ export const ProjectProvider = ({ children }) => {
         return pending.filter(r => r.requestedByUid === user.uid).length;
     }, [approvalRequests, user]);
 
+    // ส่งแจ้งเตือนเข้า LINE (ผ่าน serverless function — fire-and-forget ไม่บล็อกงานหลัก)
+    const notifyLine = async (text) => {
+        try {
+            const idToken = await auth.currentUser?.getIdToken?.();
+            if (!idToken) return;
+            await fetch('/api/notify-line', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken, text }),
+            });
+        } catch (e) {
+            console.warn('notifyLine (ไม่กระทบการทำงาน):', e?.message);
+        }
+    };
+
     // วิศวกรยื่นคำขอ
     const createApprovalRequest = async (type, plotName, group, payload, summary) => {
         try {
@@ -438,6 +453,15 @@ export const ProjectProvider = ({ children }) => {
                 type: 'warning', isActive: true,
                 targetType: 'roles', targetRoles: ['ADMIN', 'DEV'],
             });
+            // แจ้งเข้า LINE กลุ่ม
+            notifyLine(
+                `🟠 มีงานรออนุมัติ\n` +
+                `ประเภท: ${type === 'PO' ? 'เปิดใบสั่งจ้าง (PO)' : 'เบิกค่าแรง (DV)'}\n` +
+                `โครงการ: ${group} / ${plotName}\n` +
+                `ผู้ขอ: ${user?.username || '-'}\n` +
+                `รายละเอียด: ${summary}\n` +
+                `— กรุณาเข้าระบบเพื่ออนุมัติ`
+            );
             logAudit('APPROVAL_REQUEST', `${type} | ${plotName} | ${summary}`);
             return true;
         } catch (e) { console.error('createApprovalRequest:', e); return false; }
