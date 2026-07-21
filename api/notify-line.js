@@ -49,7 +49,7 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
                 to: targetId,
-                messages: [{ type: 'text', text: text.slice(0, 4900) }],
+                messages: [{ type: 'text', text: text.slice(0, 4900) }], 
             }),
         });
 
