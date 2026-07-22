@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { FaPrint, FaChevronRight, FaHardHat, FaCalendarAlt } from 'react-icons/fa';
+import { FaPrint, FaChevronRight, FaHardHat, FaCalendarAlt, FaCheckSquare, FaRegSquare } from 'react-icons/fa';
 import PrintModal from '../components/PrintModal';
 
 const DVHistory = () => {
@@ -8,7 +8,26 @@ const DVHistory = () => {
     const isSimpleView = user?.role === 'USER' || user?.role === 'PROJECT';
     const dvList = (currentProjectData.docs || []).filter(d => d.type === 'DV');
     const [previewData, setPreviewData] = useState(null);
+    const [batchList, setBatchList]     = useState(null);   // array เมื่อพิมพ์หลายใบ
+    const [selected, setSelected]       = useState(new Set()); // id ที่ติ๊กไว้
     const [expandedMonths, setExpandedMonths] = useState(new Set());
+
+    // ── ติ๊กเลือก ──
+    const toggleSel = (id) => setSelected(prev => {
+        const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
+    });
+    const setMany = (ids, on) => setSelected(prev => {
+        const s = new Set(prev); ids.forEach(id => on ? s.add(id) : s.delete(id)); return s;
+    });
+    // พิมพ์ตาม id ที่เลือก (เรียงตามวันที่)
+    const printByIds = (ids) => {
+        const idSet = new Set(ids);
+        const docs = dvList
+            .filter(d => idSet.has(d.id))
+            .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        if (docs.length) setBatchList(docs);
+    };
+    const closePrint = () => { setPreviewData(null); setBatchList(null); };
 
     const { monthlyGroups, grandTotal } = useMemo(() => {
         const groups = {};
@@ -55,13 +74,34 @@ const DVHistory = () => {
             ) : isSimpleView ? (
                 /* ── Simple view สำหรับ USER / PROJECT ── */
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <span className="text-sm font-bold text-slate-600">{dvList.length} รายการ</span>
-                        <span className="text-xs text-slate-400">ประวัติทั้งหมด</span>
-                    </div>
+                    {(() => {
+                        const allIds  = sortedDvList.map(d => d.id);
+                        const selCount = allIds.filter(id => selected.has(id)).length;
+                        const allSel   = allIds.length > 0 && selCount === allIds.length;
+                        return (
+                        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
+                            <button
+                                onClick={() => setMany(allIds, !allSel)}
+                                className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-purple-700 transition"
+                            >
+                                {allSel ? <FaCheckSquare className="text-purple-500" /> : <FaRegSquare className="text-slate-400" />}
+                                เลือกทั้งหมด ({dvList.length})
+                            </button>
+                            {selCount > 0 && (
+                                <button
+                                    onClick={() => printByIds(allIds.filter(id => selected.has(id)))}
+                                    className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition"
+                                >
+                                    <FaPrint size={11} /> พิมพ์ที่เลือก ({selCount})
+                                </button>
+                            )}
+                        </div>
+                        );
+                    })()}
                     <table className="w-full text-sm">
                         <thead className="bg-purple-50">
                             <tr>
+                                <th className="px-3 py-2.5 text-center w-10"></th>
                                 <th className="px-5 py-2.5 text-left text-xs font-bold text-purple-700">เลขที่ DV</th>
                                 <th className="px-5 py-2.5 text-left text-xs font-bold text-purple-700">วันที่</th>
                                 <th className="px-5 py-2.5 text-left text-xs font-bold text-purple-700">จ่ายให้</th>
@@ -72,8 +112,14 @@ const DVHistory = () => {
                         <tbody className="divide-y divide-slate-50">
                             {sortedDvList.map(doc => {
                                 const total = (doc.items || []).reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
+                                const isSel = selected.has(doc.id);
                                 return (
-                                    <tr key={doc.id} className="hover:bg-purple-50/30 transition">
+                                    <tr key={doc.id} className={`transition ${isSel ? 'bg-purple-50/60' : 'hover:bg-purple-50/30'}`}>
+                                        <td className="px-3 py-3 text-center">
+                                            <button onClick={() => toggleSel(doc.id)} className="p-1" title="เลือก">
+                                                {isSel ? <FaCheckSquare className="text-purple-500" /> : <FaRegSquare className="text-slate-300" />}
+                                            </button>
+                                        </td>
                                         <td className="px-5 py-3 font-bold text-purple-600">{doc.no}</td>
                                         <td className="px-5 py-3 text-slate-500 text-xs">
                                             {new Date(doc.date).toLocaleDateString('th-TH', {
@@ -163,11 +209,34 @@ const DVHistory = () => {
                                         </div>
                                     </button>
 
-                                    {isOpen && (
+                                    {isOpen && (() => {
+                                        const monthIds  = group.docs.map(d => d.id);
+                                        const selCount  = monthIds.filter(id => selected.has(id)).length;
+                                        const allSel    = monthIds.length > 0 && selCount === monthIds.length;
+                                        return (
                                         <div className="border-t border-slate-100">
+                                            {/* แถบเลือก + พิมพ์ที่เลือก */}
+                                            <div className="flex items-center justify-between px-5 py-2 bg-purple-50/50 border-b border-purple-100">
+                                                <button
+                                                    onClick={() => setMany(monthIds, !allSel)}
+                                                    className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-purple-700 transition"
+                                                >
+                                                    {allSel ? <FaCheckSquare className="text-purple-500" /> : <FaRegSquare className="text-slate-400" />}
+                                                    เลือกทั้งเดือน
+                                                </button>
+                                                {selCount > 0 && (
+                                                    <button
+                                                        onClick={() => printByIds(monthIds.filter(id => selected.has(id)))}
+                                                        className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm transition"
+                                                    >
+                                                        <FaPrint size={11} /> พิมพ์ที่เลือก ({selCount})
+                                                    </button>
+                                                )}
+                                            </div>
                                             <table className="w-full text-sm">
                                                 <thead className="bg-purple-50">
                                                     <tr>
+                                                        <th className="px-3 py-2.5 text-center w-10"></th>
                                                         <th className="px-5 py-2.5 text-left text-xs font-bold text-purple-700">เลขที่ DV</th>
                                                         <th className="px-5 py-2.5 text-left text-xs font-bold text-purple-700">วันที่</th>
                                                         <th className="px-5 py-2.5 text-left text-xs font-bold text-purple-700">จ่ายให้</th>
@@ -176,8 +245,15 @@ const DVHistory = () => {
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-50">
-                                                    {[...group.docs].reverse().map(doc => (
-                                                        <tr key={doc.id} className="hover:bg-purple-50/30 transition">
+                                                    {[...group.docs].reverse().map(doc => {
+                                                        const isSel = selected.has(doc.id);
+                                                        return (
+                                                        <tr key={doc.id} className={`transition ${isSel ? 'bg-purple-50/60' : 'hover:bg-purple-50/30'}`}>
+                                                            <td className="px-3 py-3 text-center">
+                                                                <button onClick={() => toggleSel(doc.id)} className="p-1" title="เลือก">
+                                                                    {isSel ? <FaCheckSquare className="text-purple-500" /> : <FaRegSquare className="text-slate-300" />}
+                                                                </button>
+                                                            </td>
                                                             <td className="px-5 py-3 font-bold text-purple-600">{doc.no}</td>
                                                             <td className="px-5 py-3 text-slate-500 text-xs">
                                                                 {new Date(doc.date).toLocaleDateString('th-TH', {
@@ -195,11 +271,12 @@ const DVHistory = () => {
                                                                 </button>
                                                             </td>
                                                         </tr>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </tbody>
                                                 <tfoot className="bg-slate-50 border-t border-slate-200">
                                                     <tr>
-                                                        <td colSpan="3" className="px-5 py-2.5 text-right text-xs font-bold text-slate-500">
+                                                        <td colSpan="4" className="px-5 py-2.5 text-right text-xs font-bold text-slate-500">
                                                             รวมเดือน {group.label}:
                                                         </td>
                                                         <td className="px-5 py-2.5 text-right font-bold text-purple-700">
@@ -210,7 +287,8 @@ const DVHistory = () => {
                                                 </tfoot>
                                             </table>
                                         </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             );
                         })}
@@ -219,9 +297,10 @@ const DVHistory = () => {
             )}
 
             <PrintModal
-                isOpen={!!previewData}
-                onClose={() => setPreviewData(null)}
+                isOpen={!!previewData || !!(batchList && batchList.length)}
+                onClose={closePrint}
                 data={previewData}
+                dataList={batchList}
             />
         </div>
     );

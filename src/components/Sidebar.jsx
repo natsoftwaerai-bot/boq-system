@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
+import { auth } from '../firebase';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import {
     FaChartPie, FaListUl, FaBoxOpen, FaHistory,
     FaFileInvoiceDollar, FaCheckCircle, FaHardHat,
@@ -36,6 +38,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
 
     // ── พับ/ขยาย sidebar (จำสถานะไว้ใน localStorage) ──
     const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
+    const [resetting, setResetting] = useState(false);
     const toggleCollapsed = () => {
         setCollapsed(c => {
             localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1');
@@ -44,12 +47,35 @@ const Sidebar = ({ activePage, setActivePage }) => {
     };
 
     // --- ฟังก์ชันล้างระบบทั้งหมด (Factory Reset) ---
-    const resetData = () => {
-        if(confirm("⚠️ คำเตือน: ข้อมูล 'ทุกโครงการ' จะถูกลบทั้งหมดและกู้คืนไม่ได้!\n\nคุณแน่ใจหรือไม่ที่จะล้างระบบ?")) {
+    const resetData = async () => {
+        if (resetting) return;
+        if (!confirm("⚠️ คำเตือน: ข้อมูล 'ทุกโครงการ' จะถูกลบทั้งหมดและกู้คืนไม่ได้!\n\nคุณแน่ใจหรือไม่ที่จะล้างระบบ?")) return;
+
+        const password = prompt('กรอกรหัสผ่านของบัญชี DEV เพื่อยืนยันการล้างระบบ:');
+        if (password === null) return;
+        if (!password) {
+            alert('กรุณากรอกรหัสผ่าน');
+            return;
+        }
+
+        setResetting(true);
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser?.email || user?.role !== 'DEV') {
+                throw new Error('บัญชีนี้ไม่มีสิทธิ์ล้างระบบ');
+            }
+            const credential = EmailAuthProvider.credential(currentUser.email, password);
+            await reauthenticateWithCredential(currentUser, credential);
+
             // ลบ Key ที่เราเก็บข้อมูลไว้ใน LocalStorage
             localStorage.removeItem('CONSTRUCTION_SYSTEM_MULTI_V86');
             // รีโหลดหน้าเพื่อให้ระบบสร้างข้อมูลเริ่มต้นใหม่
             window.location.reload();
+        } catch (e) {
+            console.error('resetData reauthentication failed:', e);
+            const wrongPassword = ['auth/invalid-credential', 'auth/wrong-password'].includes(e?.code);
+            alert(wrongPassword ? 'รหัสผ่าน DEV ไม่ถูกต้อง ระบบยังไม่ได้ล้างข้อมูล' : `ยืนยันตัวตนไม่สำเร็จ: ${e.message}`);
+            setResetting(false);
         }
     };
 
@@ -301,10 +327,11 @@ const Sidebar = ({ activePage, setActivePage }) => {
                 {isDev && (
                     <button
                         onClick={resetData}
+                        disabled={resetting}
                         title="ล้างระบบทั้งหมด"
-                        className={`w-full py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 hover:text-red-600 rounded border border-red-200 transition flex items-center justify-center gap-2 mt-1`}
+                        className={`w-full py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 hover:text-red-600 rounded border border-red-200 transition flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                        <FaTrash /> {!collapsed && 'ล้างระบบทั้งหมด'}
+                        <FaTrash /> {!collapsed && (resetting ? 'กำลังตรวจสอบ...' : 'ล้างระบบทั้งหมด')}
                     </button>
                 )}
             </div>

@@ -1,10 +1,5 @@
 // Vercel Serverless Function — ส่งแจ้งเตือน LINE ผ่าน Messaging API (push ไปกลุ่ม)
 // Token เก็บเป็น Environment Variable ฝั่ง server เท่านั้น ไม่หลุดถึง client
-//
-// ต้องตั้งค่า Environment Variables ใน Vercel (Settings → Environment Variables):
-//   LINE_CHANNEL_ACCESS_TOKEN = <Channel access token จาก LINE Developers Console>
-//   LINE_TARGET_ID            = <Group ID ที่จะส่งเข้า (ขึ้นต้นด้วย C...)>
-//   FIREBASE_API_KEY          = AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI  (ใช้ยืนยันผู้เรียก)
 
 const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { FaClipboardCheck, FaCheck, FaTimes, FaBoxOpen, FaHardHat, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaClipboardCheck, FaCheck, FaTimes, FaTrash, FaBoxOpen, FaHardHat, FaChevronDown, FaChevronUp, FaFolderOpen } from 'react-icons/fa';
 
 const STATUS_STYLE = {
     PENDING:  { label: 'รออนุมัติ',  cls: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -20,7 +20,7 @@ const requestTotal = (req) => {
 };
 
 const Approvals = () => {
-    const { approvalRequests, approveRequest, rejectRequest, user } = useProject();
+    const { approvalRequests, approveRequest, rejectRequest, deleteApprovalRequest, user } = useProject();
     const [expanded, setExpanded] = useState(new Set());
     const [busy, setBusy] = useState(null);
     const [filter, setFilter] = useState('PENDING');
@@ -33,6 +33,20 @@ const Approvals = () => {
         if (filter === 'ALL') return base;
         return base.filter(r => r.status === filter);
     }, [approvalRequests, isApprover, user, filter]);
+
+    // จัดกลุ่มคำขอตามโครงการ (group) — เรียงโครงการตามตัวอักษร, ในกลุ่มเรียงใหม่สุดก่อน
+    const grouped = useMemo(() => {
+        const map = {};
+        visible.forEach(r => {
+            const g = r.group || 'ไม่ระบุโครงการ';
+            (map[g] = map[g] || []).push(r);
+        });
+        return Object.keys(map).sort((a, b) => a.localeCompare(b, 'th')).map(g => ({
+            group: g,
+            requests: map[g],
+            pending: map[g].filter(r => r.status === 'PENDING').length,
+        }));
+    }, [visible]);
 
     const toggle = (id) => setExpanded(prev => {
         const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
@@ -50,6 +64,13 @@ const Approvals = () => {
         if (reason === null) return;
         setBusy(req.id);
         await rejectRequest(req, reason.trim());
+        setBusy(null);
+    };
+
+    const handleDelete = async (req) => {
+        if (!confirm(`ยืนยันลบคำขอ ${req.type} ของ ${req.requestedBy}?\nเมื่อลบแล้วจะกู้คืนไม่ได้`)) return;
+        setBusy(req.id);
+        await deleteApprovalRequest(req);
         setBusy(null);
     };
 
@@ -78,8 +99,21 @@ const Approvals = () => {
                 </div>
             )}
 
-            <div className="space-y-3">
-                {visible.map(req => {
+            {grouped.map(({ group, requests, pending }) => (
+              <div key={group} className="mb-6">
+                {/* หัวข้อโครงการ */}
+                <div className="flex items-center gap-2 mb-2 px-1">
+                    <FaFolderOpen className="text-blue-400" />
+                    <span className="font-bold text-slate-700 text-sm">{group}</span>
+                    <span className="text-xs text-slate-400">({requests.length} คำขอ)</span>
+                    {pending > 0 && (
+                        <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                            รออนุมัติ {pending}
+                        </span>
+                    )}
+                </div>
+                <div className="space-y-3">
+                {requests.map(req => {
                     const st = STATUS_STYLE[req.status] || STATUS_STYLE.PENDING;
                     const isExp = expanded.has(req.id);
                     const total = requestTotal(req);
@@ -170,6 +204,12 @@ const Approvals = () => {
                             {/* Action buttons — ADMIN/DEV เท่านั้น */}
                             {isApprover && req.status === 'PENDING' && (
                                 <div className="border-t border-slate-100 px-4 py-2.5 flex justify-end gap-2 bg-white">
+                                    {user?.role === 'DEV' && (
+                                        <button onClick={() => handleDelete(req)} disabled={busy === req.id}
+                                            className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-red-600 hover:border-red-200 transition flex items-center gap-1.5 disabled:opacity-50">
+                                            <FaTrash size={10} /> ลบคำขอ
+                                        </button>
+                                    )}
                                     <button onClick={() => handleReject(req)} disabled={busy === req.id}
                                         className="px-4 py-1.5 rounded-lg text-xs font-bold text-red-600 border border-red-200 hover:bg-red-50 transition flex items-center gap-1.5 disabled:opacity-50">
                                         <FaTimes size={10} /> ปฏิเสธ
@@ -183,7 +223,9 @@ const Approvals = () => {
                         </div>
                     );
                 })}
-            </div>
+                </div>
+              </div>
+            ))}
         </div>
     );
 };

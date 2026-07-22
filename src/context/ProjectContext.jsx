@@ -611,6 +611,20 @@ export const ProjectProvider = ({ children }) => {
         } catch (e) { console.error('rejectRequest:', e); return false; }
     };
 
+    // DEV ลบคำขอที่ยังรออนุมัติ
+    const deleteApprovalRequest = async (req) => {
+        if (user?.role !== 'DEV' || req?.status !== 'PENDING') return false;
+        try {
+            await deleteDoc(doc(db, 'approval_requests', req.id));
+            logAudit('APPROVAL_DELETE', `${req.type} | ${req.plotName} | ${req.summary}`);
+            return true;
+        } catch (e) {
+            console.error('deleteApprovalRequest:', e);
+            alert('ลบคำขอไม่สำเร็จ: ' + e.message);
+            return false;
+        }
+    };
+
     // ==========================================
     // 2. Backup System
     // ==========================================
@@ -982,11 +996,13 @@ export const ProjectProvider = ({ children }) => {
         if (!user || user.role === 'ADMIN' || user.role === 'DEV') {
             return system.projects.map((_, i) => i);
         }
-        if (!user.projectAccess || !Array.isArray(user.projectAccess) || user.projectAccess.length === 0) {
+        if (!Array.isArray(user.projectAccess)) {
             return system.projects.map((_, i) => i);
         }
         return system.projects.reduce((acc, p, i) => {
-            if (user.projectAccess.includes(p.name)) acc.push(i);
+            const accessKey = JSON.stringify([getGroupOf(p), p.name]);
+            // รองรับข้อมูลเดิมที่เก็บสิทธิ์ด้วยชื่อแปลงอย่างเดียว
+            if (user.projectAccess.includes(accessKey) || user.projectAccess.includes(p.name)) acc.push(i);
             return acc;
         }, []);
     })();
@@ -1044,6 +1060,7 @@ export const ProjectProvider = ({ children }) => {
             createApprovalRequest,
             approveRequest,
             rejectRequest,
+            deleteApprovalRequest,
             currentProjectData,
             currentProjectName,
             updateProjectData,

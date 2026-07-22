@@ -89,6 +89,7 @@ const StatCard = ({ icon, label, value, sub, color }) => (
 );
 
 const EMPTY_FORM = { email: '', username: '', password: '', role: 'USER' };
+const projectAccessKey = (project) => JSON.stringify([getGroupOf(project), project.name]);
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -101,7 +102,9 @@ const DevPanel = () => {
         notifications, createNotification, updateNotification, deleteNotification, toggleNotificationActive,
         maintenanceMode, maintenanceMessage, saveMaintenance,
     } = useProject();
-    const allProjects = system.projects.map(p => p.name);
+    const accessProjects = system.projects.map(p => ({ key: projectAccessKey(p), name: p.name, group: getGroupOf(p) }));
+    const allAccessKeys = accessProjects.map(p => p.key);
+    const accessGroups = [...new Set(accessProjects.map(p => p.group))];
     const isDev = user?.role === 'DEV';
 
     // Filter tabs ตาม role + permissions
@@ -320,7 +323,14 @@ const DevPanel = () => {
 
     const openAccessModal = (u) => {
         setAccessUser(u);
-        setAccessSelections(Array.isArray(u.projectAccess) ? [...u.projectAccess] : [...allProjects]);
+        if (!Array.isArray(u.projectAccess)) {
+            setAccessSelections([...allAccessKeys]);
+        } else {
+            // รองรับข้อมูลเดิมที่เก็บเฉพาะชื่อแปลง
+            setAccessSelections(accessProjects
+                .filter(p => u.projectAccess.includes(p.key) || u.projectAccess.includes(p.name))
+                .map(p => p.key));
+        }
         setShowAccessModal(true);
     };
 
@@ -330,7 +340,9 @@ const DevPanel = () => {
     const saveProjectAccess = async () => {
         setAccessSaving(true);
         try {
-            const newAccess = accessSelections.length === allProjects.length ? null : accessSelections;
+            const newAccess = allAccessKeys.length > 0 && allAccessKeys.every(key => accessSelections.includes(key))
+                ? null
+                : accessSelections;
             await updateDoc(doc(db, 'users', accessUser.uid), { projectAccess: newAccess });
             setUsers(prev => prev.map(u => u.uid === accessUser.uid ? { ...u, projectAccess: newAccess } : u));
             setShowAccessModal(false);
@@ -545,7 +557,10 @@ const DevPanel = () => {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {users.map(u => {
-                                    const isFullAccess = !Array.isArray(u.projectAccess) || u.projectAccess.length >= allProjects.length;
+                                    const selectedProjects = Array.isArray(u.projectAccess)
+                                        ? accessProjects.filter(p => u.projectAccess.includes(p.key) || u.projectAccess.includes(p.name))
+                                        : accessProjects;
+                                    const isFullAccess = !Array.isArray(u.projectAccess);
                                     return (
                                         <tr key={u.uid} className="hover:bg-slate-50 transition">
                                             <td className="px-4 py-3 font-bold text-slate-700">{u.username}</td>
@@ -579,11 +594,15 @@ const DevPanel = () => {
                                                             <span className="text-xs text-slate-400 flex items-center gap-1">
                                                                 <FaUnlock className="text-green-400" /> ทุกโครงการ
                                                             </span>
+                                                        ) : selectedProjects.length === 0 ? (
+                                                            <span className="text-xs text-red-500 flex items-center gap-1">
+                                                                <FaLock className="text-red-400" /> ไม่เห็นโครงการใด
+                                                            </span>
                                                         ) : (
                                                             <div className="flex flex-wrap gap-1">
-                                                                {u.projectAccess.map(name => (
-                                                                    <span key={name} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-100">
-                                                                        {name}
+                                                                {selectedProjects.map(p => (
+                                                                    <span key={p.key} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-100">
+                                                                        {p.group} / {p.name}
                                                                     </span>
                                                                 ))}
                                                             </div>
@@ -1107,7 +1126,7 @@ const DevPanel = () => {
             {/* ══ Modal: Project Access ════════════════════════════════════════════ */}
             {showAccessModal && accessUser && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
                         <div className="flex justify-between items-center p-5 border-b border-slate-100">
                             <div>
                                 <h3 className="font-bold text-slate-700 text-lg flex items-center gap-2">
@@ -1118,20 +1137,40 @@ const DevPanel = () => {
                             <button onClick={() => setShowAccessModal(false)} className="text-slate-400 hover:text-slate-700 p-1 rounded"><FaTimes /></button>
                         </div>
                         <div className="p-5 space-y-3">
-                            <p className="text-xs text-slate-500">ติ๊กครบทุกโครงการ = ไม่จำกัดสิทธิ์</p>
+                            <p className="text-xs text-slate-500">เลือกโครงการและแปลนบ้าน/แปลงบ้านที่บัญชีนี้สามารถมองเห็นได้</p>
                             <div className="flex gap-3 text-xs mb-1">
-                                <button onClick={() => setAccessSelections([...allProjects])} className="text-blue-500 hover:text-blue-700 font-medium">เลือกทั้งหมด</button>
+                                <button onClick={() => setAccessSelections([...allAccessKeys])} className="text-blue-500 hover:text-blue-700 font-medium">เลือกทั้งหมด</button>
                                 <span className="text-slate-300">|</span>
                                 <button onClick={() => setAccessSelections([])} className="text-slate-400 hover:text-slate-600">ล้างทั้งหมด</button>
                             </div>
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {allProjects.map(name => (
-                                    <label key={name} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50 cursor-pointer transition">
-                                        <input type="checkbox" checked={accessSelections.includes(name)} onChange={() => toggleAccessProject(name)} className="w-4 h-4 accent-purple-600" />
-                                        <span className="text-sm font-medium text-slate-700 flex-1">{name}</span>
-                                        {accessSelections.includes(name) ? <FaUnlock className="text-green-400 text-xs" /> : <FaLock className="text-red-300 text-xs" />}
-                                    </label>
-                                ))}
+                            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                                {accessGroups.map(group => {
+                                    const groupProjects = accessProjects.filter(p => p.group === group);
+                                    const selectedCount = groupProjects.filter(p => accessSelections.includes(p.key)).length;
+                                    const allSelected = selectedCount === groupProjects.length;
+                                    const toggleGroup = () => setAccessSelections(prev => allSelected
+                                        ? prev.filter(key => !groupProjects.some(p => p.key === key))
+                                        : [...new Set([...prev, ...groupProjects.map(p => p.key)])]);
+                                    return (
+                                        <div key={group} className="rounded-xl border border-slate-200 overflow-hidden">
+                                            <label className="flex items-center gap-3 px-3 py-2.5 bg-slate-50 cursor-pointer hover:bg-purple-50 transition">
+                                                <input type="checkbox" checked={allSelected} onChange={toggleGroup} className="w-4 h-4 accent-purple-600" />
+                                                <FaFolderOpen className="text-blue-400" />
+                                                <span className="text-sm font-bold text-slate-700 flex-1">{group}</span>
+                                                <span className="text-[10px] text-slate-400">{selectedCount}/{groupProjects.length} แปลง</span>
+                                            </label>
+                                            <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                {groupProjects.map(project => (
+                                                    <label key={project.key} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-purple-50 cursor-pointer transition">
+                                                        <input type="checkbox" checked={accessSelections.includes(project.key)} onChange={() => toggleAccessProject(project.key)} className="w-4 h-4 accent-purple-600" />
+                                                        <span className="text-xs font-medium text-slate-700 flex-1">{project.name}</span>
+                                                        {accessSelections.includes(project.key) ? <FaUnlock className="text-green-400 text-[10px]" /> : <FaLock className="text-red-300 text-[10px]" />}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                             {accessSelections.length === 0 && (
                                 <div className="text-xs text-red-500 bg-red-50 border border-red-100 p-2 rounded-lg">⚠️ ผู้ใช้จะไม่เห็นโครงการใดเลย</div>
