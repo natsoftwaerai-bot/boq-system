@@ -4,7 +4,7 @@ import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 const app = initializeApp({
-    apiKey: 'AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI',
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: 'boq-system-react.firebaseapp.com',
     projectId: 'boq-system-react',
 });
