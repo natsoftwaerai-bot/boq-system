@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.example
+
+ต้นทุนบ้านแถว Prime Life Ayutthaya.xlsx
+ต้นทุนบ้านแถว THE ECO NAKONLUANG.xlsx
