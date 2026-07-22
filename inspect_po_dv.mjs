@@ -2,12 +2,9 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { firebaseNodeConfig } from './firebase-node-config.mjs';
 
-const app = initializeApp({
-    apiKey: 'AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI',
-    authDomain: 'boq-system-react.firebaseapp.com',
-    projectId: 'boq-system-react',
-});
+const app = initializeApp(firebaseNodeConfig);
 await signInWithEmailAndPassword(getAuth(app), 'dev@nutcon.com', process.argv[2]);
 const s = (await getDoc(doc(getFirestore(app), 'construction_data', 'main_system'))).data();
 

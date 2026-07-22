@@ -41,7 +41,7 @@ Vercel → เลือกโปรเจกต์ → **Settings → Environmen
 |-----|-------|
 | `LINE_CHANNEL_ACCESS_TOKEN` | token จากข้อ 1 |
 | `LINE_TARGET_ID` | group ID จากข้อ 2 (ขึ้นต้น `C`) |
-| `FIREBASE_API_KEY` | `AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI` |
+| `FIREBASE_API_KEY` | ค่าเดียวกับ `VITE_FIREBASE_API_KEY` ใน `.env` หรือ Firebase Console |
 
 จากนั้น **Redeploy** โปรเจกต์ 1 ครั้งเพื่อให้ค่ามีผล
 

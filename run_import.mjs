@@ -12,18 +12,12 @@ import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { firebaseNodeConfig } from './firebase-node-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Firebase config (จาก .env)
-const firebaseConfig = {
-    apiKey:            'AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI',
-    authDomain:        'boq-system-react.firebaseapp.com',
-    projectId:         'boq-system-react',
-    storageBucket:     'boq-system-react.firebasestorage.app',
-    messagingSenderId: '987204716777',
-    appId:             '1:987204716777:web:f716014c0d887737d1c878',
-};
+const firebaseConfig = firebaseNodeConfig;
 
 const EMAIL    = 'dev@nutcon.com';
 const PASSWORD = process.argv[2];

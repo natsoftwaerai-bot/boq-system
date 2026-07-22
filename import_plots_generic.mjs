@@ -13,6 +13,7 @@ import { getFirestore, doc, getDoc, setDoc, collection, addDoc } from 'firebase/
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { firebaseNodeConfig } from './firebase-node-config.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const [INPUT_ARG, GROUP_NAME, PASSWORD] = [process.argv[2], process.argv[3], process.argv[4]];
@@ -24,11 +25,7 @@ if (!INPUT_ARG || !GROUP_NAME || (!PASSWORD && !DRY)) {
 }
 const INPUT_FILE = path.join(__dirname, INPUT_ARG);
 
-const firebaseConfig = {
-    apiKey: 'AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI',
-    authDomain: 'boq-system-react.firebaseapp.com',
-    projectId: 'boq-system-react',
-};
+const firebaseConfig = firebaseNodeConfig;
 
 const cellVal = (cell) => {
     if (!cell) return null;

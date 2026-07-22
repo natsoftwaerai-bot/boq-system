@@ -2,12 +2,9 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { firebaseNodeConfig } from './firebase-node-config.mjs';
 
-const app = initializeApp({
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: 'boq-system-react.firebaseapp.com',
-    projectId: 'boq-system-react',
-});
+const app = initializeApp(firebaseNodeConfig);
 await signInWithEmailAndPassword(getAuth(app), 'dev@nutcon.com', process.argv[2]);
 const s = (await getDoc(doc(getFirestore(app), 'construction_data', 'main_system'))).data();
 const fmt = n => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
