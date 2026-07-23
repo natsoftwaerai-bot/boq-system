@@ -18,6 +18,7 @@ import { firebaseNodeConfig } from './firebase-node-config.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const [INPUT_ARG, GROUP_NAME, PASSWORD] = [process.argv[2], process.argv[3], process.argv[4]];
 const DRY = process.argv.includes('--dry-run');
+const MERGE = process.argv.includes('--merge'); // เข้าโครงการเดิม + ลบแปลงว่างในโครงการนั้น
 
 if (!INPUT_ARG || !GROUP_NAME || (!PASSWORD && !DRY)) {
     console.error('\nUsage: node import_plots_generic.mjs "<file.xlsx>" "<ชื่อโครงการ>" "<password>" [--dry-run]\n');
@@ -132,9 +133,9 @@ async function main() {
     const system = (await getDoc(ref)).data();
     console.log(`   ✓ ปัจจุบัน ${system.projects.length} แปลง`);
 
-    // กันชื่อโครงการซ้ำ
-    if (system.projects.some(p => (p.group || '') === GROUP_NAME)) {
-        console.error(`\n⚠️ มีโครงการ "${GROUP_NAME}" อยู่แล้ว — ยกเลิกกันข้อมูลซ้ำ\n`); process.exit(1);
+    const groupExists = system.projects.some(p => (p.group || '') === GROUP_NAME);
+    if (groupExists && !MERGE) {
+        console.error(`\n⚠️ มีโครงการ "${GROUP_NAME}" อยู่แล้ว — ใช้ --merge เพื่อเข้าโครงการเดิม\n`); process.exit(1);
     }
 
     console.log('🛟 สำรองข้อมูล...');
@@ -143,6 +144,16 @@ async function main() {
         label: `ก่อน import ${GROUP_NAME} ${new Date().toLocaleString('th-TH')}`,
         projectCount: system.projects.length, data: sanitize(system),
     });
+
+    // โหมด merge: ลบแปลงว่าง (0 รายการ) ในโครงการเดิมก่อนเพิ่มของจริง
+    if (MERGE && groupExists) {
+        const before = system.projects.length;
+        system.projects = system.projects.filter(p =>
+            !((p.group || '') === GROUP_NAME && (p.data?.boq || []).filter(i => i.type === 'item').length === 0)
+        );
+        const removed = before - system.projects.length;
+        if (removed) console.log(`   🧹 ลบแปลงว่างในโครงการเดิม ${removed} แปลง`);
+    }
     system.projects = [...system.projects, ...plots];
     await setDoc(ref, sanitize(system));
     console.log(`\n✅ สำเร็จ! เพิ่ม ${plots.length} แปลงในโครงการ "${GROUP_NAME}" — รวม ${system.projects.length} แปลง\n`);

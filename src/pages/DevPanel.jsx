@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { importPlotsFromExcel } from '../utils/excelHelper';
 import { db, secondaryAuth, auth } from '../firebase';
 import { collection, getDocs, query, orderBy, limit, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
@@ -98,7 +99,7 @@ const DevPanel = () => {
         system, addProject, deleteProjectByIndex, updateProjectNameByIndex, setProjectGroupByIndex,
         user, permissions, savePermissions,
         approvalConfig, saveApprovalConfig,
-        cancelDVByIndex,
+        cancelDVByIndex, importPlots,
         notifications, createNotification, updateNotification, deleteNotification, toggleNotificationActive,
         maintenanceMode, maintenanceMessage, saveMaintenance,
     } = useProject();
@@ -106,6 +107,43 @@ const DevPanel = () => {
     const allAccessKeys = accessProjects.map(p => p.key);
     const accessGroups = [...new Set(accessProjects.map(p => p.group))];
     const isDev = user?.role === 'DEV';
+
+    // ── นำเข้าโครงการจาก Excel (แต่ละ sheet = 1 แปลง) ──
+    const importFileRef = useRef(null);
+    const [importing, setImporting] = useState(false);
+
+    const handleImportProjectFile = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        const groupName = (prompt('ตั้งชื่อโครงการที่จะนำเข้า (แต่ละ sheet = 1 แปลงบ้าน):') || '').trim();
+        if (!groupName) return;
+        setImporting(true);
+        try {
+            const { plots, report } = await importPlotsFromExcel(file, groupName);
+            if (!plots.length) { alert('ไม่พบ sheet ข้อมูลในไฟล์ (แต่ละ sheet ต้องมีหัวตารางแถว 1-5)'); return; }
+
+            const anyBad = report.some(r => !r.okM || !r.okL);
+            const lines = report.map(r =>
+                `• ${r.name}: ${r.items} รายการ ${(!r.okM || !r.okL) ? '⚠ ยอดไม่ตรง Excel' : '✓ ยอดตรง'}` +
+                `${r.warns ? ` (เหมา ${r.warns})` : ''}`
+            ).join('\n');
+            const exists = system.projects.some(p => getGroupOf(p) === groupName);
+
+            let msg = `นำเข้า ${plots.length} แปลง เข้าโครงการ "${groupName}"\n\n${lines}`;
+            if (anyBad) msg += `\n\n⚠️ มีแปลงที่ยอดคำนวณไม่ตรงกับ Excel — แนะนำตรวจไฟล์ก่อนยืนยัน`;
+            if (exists) msg += `\n\n⚠️ มีโครงการชื่อนี้อยู่แล้ว — ยืนยันเพื่อ "รวมเข้าโครงการเดิม" (ลบแปลงว่างในนั้นออก)`;
+            if (!confirm(msg + `\n\nยืนยันนำเข้า?`)) return;
+
+            const res = await importPlots(plots, groupName, { merge: exists });
+            if (res.ok) alert(`✅ นำเข้าสำเร็จ ${res.count} แปลง เข้าโครงการ "${groupName}"\n(สำรองข้อมูลก่อนหน้าไว้ใน Backup & Restore แล้ว)`);
+            else alert('❌ ' + res.msg);
+        } catch (err) {
+            alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+        } finally {
+            setImporting(false);
+        }
+    };
 
     // Filter tabs ตาม role + permissions
     const TABS = ALL_TABS.filter(tab => {
@@ -660,10 +698,26 @@ const DevPanel = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="flex justify-between items-center p-4 border-b border-slate-100">
                         <h3 className="font-bold text-slate-700">แปลงบ้านทั้งหมด ({system.projects.length} แปลง)</h3>
-                        <button onClick={() => setShowAddProject(true)}
-                            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 transition shadow-sm">
-                            <FaPlus /> เพิ่มแปลง
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {isDev && (
+                                <>
+                                    <input ref={importFileRef} type="file" accept=".xlsx,.xls" hidden onChange={handleImportProjectFile} />
+                                    <button
+                                        onClick={() => importFileRef.current?.click()}
+                                        disabled={importing}
+                                        title="นำเข้าไฟล์ Excel — แต่ละ sheet = 1 แปลงบ้าน เข้าโครงการใหม่"
+                                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition shadow-sm disabled:opacity-60"
+                                    >
+                                        <FaFileDownload className={importing ? 'animate-pulse' : ''} />
+                                        {importing ? 'กำลังนำเข้า...' : 'นำเข้าโครงการ (Excel)'}
+                                    </button>
+                                </>
+                            )}
+                            <button onClick={() => setShowAddProject(true)}
+                                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 transition shadow-sm">
+                                <FaPlus /> เพิ่มแปลง
+                            </button>
+                        </div>
                     </div>
 
                     {(() => {

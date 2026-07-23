@@ -311,6 +311,31 @@ export const ProjectProvider = ({ children }) => {
         logAudit('RENAME_GROUP', `เปลี่ยนชื่อโครงการ "${oldName}" เป็น "${newName}"`);
     };
 
+    // นำเข้าหลายแปลงเข้าโครงการใหม่ (จากปุ่ม Import Excel ใน DevPanel)
+    const importPlots = async (plots, groupName, { merge = false } = {}) => {
+        try {
+            // สำรองข้อมูลก่อนเขียน
+            await createBackup(`ก่อนนำเข้าโครงการ "${groupName}"`);
+            let projects = system.projects;
+            const exists = projects.some(p => getGroupOf(p) === groupName);
+            if (exists && !merge) return { ok: false, msg: `มีโครงการ "${groupName}" อยู่แล้ว` };
+            if (merge && exists) {
+                // ลบแปลงว่าง (0 รายการ) ในโครงการเดิมก่อนเพิ่มของจริง
+                projects = projects.filter(p =>
+                    !(getGroupOf(p) === groupName && (p.data?.boq || []).filter(i => i.type === 'item').length === 0)
+                );
+            }
+            const newSystem = { ...system, projects: [...projects, ...plots] };
+            setSystem(newSystem);
+            await saveToFirebase(newSystem);
+            logAudit('IMPORT_PROJECT', `นำเข้า ${plots.length} แปลง เข้าโครงการ "${groupName}"`);
+            return { ok: true, count: plots.length };
+        } catch (e) {
+            console.error('importPlots:', e);
+            return { ok: false, msg: e.message };
+        }
+    };
+
     // ย้ายแปลงไปโครงการอื่น (ข้อมูล BOQ/ประวัติในแปลงคงเดิมทั้งหมด)
     const setProjectGroupByIndex = (index, groupName) => {
         const plotName = system.projects[index]?.name;
@@ -1051,6 +1076,7 @@ export const ProjectProvider = ({ children }) => {
             renameGroup,
             deleteGroup,
             setProjectGroupByIndex,
+            importPlots,
             cancelDVByIndex,
             // Approval System
             approvalConfig,

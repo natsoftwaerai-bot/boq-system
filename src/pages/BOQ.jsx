@@ -37,6 +37,35 @@ const rowMatchesQuery = (item, tokens) => {
     return tokens.every(t => tokenMatches(hay, t));
 };
 
+// ── ช่องราคา: แสดง 2 ตำแหน่ง แต่เก็บค่าเต็ม (คลิกเพื่อแก้ไข เห็นค่าเต็ม) ──
+const PriceCell = ({ value, onCommit, readOnly, fmt }) => {
+    const [editing, setEditing] = useState(false);
+    const has = value !== '' && value !== null && value !== undefined;
+    if (readOnly) {
+        return <div className="w-full h-full text-right pr-1 font-mono text-slate-700 py-[9px]">{has ? fmt(value) : ''}</div>;
+    }
+    if (editing) {
+        return (
+            <input
+                type="number" autoFocus defaultValue={value}
+                onFocus={(e) => e.target.select()}
+                onBlur={(e) => { onCommit(e.target.value); setEditing(false); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditing(false); }}
+                className="w-full h-full text-right outline-none bg-white text-slate-800 font-mono pr-1 ring-1 ring-blue-300 rounded"
+            />
+        );
+    }
+    return (
+        <div
+            onClick={() => setEditing(true)}
+            title={has ? String(value) : ''}   /* hover เห็นค่าเต็ม */
+            className="w-full h-full text-right pr-1 font-mono text-slate-700 py-[9px] cursor-text hover:bg-blue-50/60"
+        >
+            {has ? fmt(value) : <span className="text-slate-300">0.00</span>}
+        </div>
+    );
+};
+
 const BOQ = () => {
     const { currentProjectData, updateProjectData, createBackup, currentProjectName, user } = useProject();
     const [items, setItems] = useState([]);
@@ -632,15 +661,15 @@ const BOQ = () => {
                                         </td>
                                         <td className={`${td} p-1 text-right font-mono text-[11.5px] font-bold text-red-500`}>{nfmt(poQty)}</td>
                                         <td className={`${td} p-0`}>
-                                            <input type="number" value={item.mP} onChange={(e) => handleChange(item.id, 'mP', e.target.value)}
-                                                className="w-full h-full text-right outline-none bg-transparent text-slate-700 font-mono pr-1" placeholder="0.00" />
+                                            <PriceCell value={item.mP} readOnly={isReadOnly} fmt={nfmt}
+                                                onCommit={(v) => handleChange(item.id, 'mP', v)} />
                                         </td>
                                         <td className={`${td} p-1 text-right ${num} font-bold`}>{nfmt(mTotal)}</td>
                                         <td className={`${td} p-1 text-right font-mono text-[11.5px] font-bold text-red-500`}>{nfmt(mPaid)}</td>
                                         <td className={`${td} p-1 text-right font-mono text-[11.5px] font-bold ${mRem < 0 ? 'text-red-500' : 'text-green-600'}`}>{nfmt(mRem)}</td>
                                         <td className={`${td} p-0`}>
-                                            <input type="number" value={item.lP} onChange={(e) => handleChange(item.id, 'lP', e.target.value)}
-                                                className="w-full h-full text-right outline-none bg-transparent text-slate-700 font-mono pr-1" placeholder="0.00" />
+                                            <PriceCell value={item.lP} readOnly={isReadOnly} fmt={nfmt}
+                                                onCommit={(v) => handleChange(item.id, 'lP', v)} />
                                         </td>
                                         <td className={`${td} p-1 text-right ${num} font-bold`}>{nfmt(lTotal)}</td>
                                         <td className={`${td} p-1 text-right font-mono text-[11.5px] font-bold text-red-500`}>{nfmt(lPaid)}</td>

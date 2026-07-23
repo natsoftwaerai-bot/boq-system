@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="512" height="512" viewBox="0 0 512 512"
+     role="img" aria-labelledby="title desc">
+  <title id="title">BOQ Architecture Logo</title>
+  <desc id="desc">Minimal BOQ logo with a simple architectural building motif inside the letter O.</desc>
+
+  <g fill="none" stroke="#3F3F3F" stroke-width="14"
+     stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- B -->
+    <path d="M92 146V366" />
+    <path d="M92 146H158C201 146 218 171 218 199
+             C218 228 198 247 160 247H92" />
+    <path d="M92 247H166C208 247 228 271 228 306
+             C228 342 204 366 160 366H92" />
+
+    <!-- O -->
+    <circle cx="306" cy="256" r="112" />
+
+    <!-- Architectural motif inside O -->
+    <path d="M259 327V232L306 185V327" />
+    <path d="M306 246L349 276V327" />
+    <path d="M259 285L226 309" />
+    <path d="M349 327H226" />
+
+    <!-- Q tail -->
+    <path d="M386 334L420 369" />
+  </g>
+</svg>

@@ -149,6 +149,78 @@ export const exportToExcel = async (currentProjectData, currentProjectName) => {
 };
 
 
+// --- ฟังก์ชัน Import โครงการ: แต่ละ sheet = 1 แปลงบ้าน ---
+// รูปแบบไฟล์ต้นทุน BOQ: หัวตารางแถว 1-5, คอลัมน์ A=ลำดับ B=รายการ C=จำนวน D=หน่วย
+// E=ค่าวัสดุ/หน่วย F=จำนวนเงินวัสดุ G=ค่าแรง/หน่วย H=จำนวนเงินค่าแรง J=หมายเหตุ
+// - ปรับราคา/หน่วยให้ยอดตรง Excel เป๊ะ (กรณีสูตรไม่ใช่ q×ราคา เช่น เหล็กเส้น ตัน↔เส้น)
+// - แถวจำนวน=0 แต่มีค่าเงิน → ตั้งเป็นเหมา 1 หน่วย
+export const importPlotsFromExcel = (file, groupName) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+            const newId = () => Math.random().toString(36).substr(2, 9);
+            const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+            const str = (v) => (v == null ? '' : String(v).trim());
+            const plots = [], report = [];
+
+            wb.SheetNames.forEach(sn => {
+                const ws = wb.Sheets[sn];
+                if (!ws) return;
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, blankrows: true });
+                if (rows.length < 6) return;
+                const name = sn.trim();
+                const boq = [{ id: newId(), type: 'header', level: 0, code: '', name, unit: '', q: 0, mP: 0, lP: 0, con: '', note: '' }];
+                let xlM = 0, xlL = 0, adj = 0, warns = 0;
+
+                for (let r = 5; r < rows.length; r++) {   // r=5 → แถว Excel ที่ 6
+                    const row = rows[r] || [];
+                    const [colA, colB, colC, colD, colE, colF, colG, colH, , colJ] = row;
+                    const bName = str(colB);
+                    if (!bName || bName.startsWith('รวม')) continue;   // ข้ามแถวสรุปทุกชั้น
+
+                    const hasQty = colC != null && colC !== '';
+                    const hasUnit = colD != null && colD !== '';
+                    let type, level;
+                    if (!hasQty && !hasUnit) { type = 'header'; level = (typeof colA === 'number') ? 1 : 2; }
+                    else { type = 'item'; level = 3; }
+
+                    const clean = type === 'item' ? bName.replace(/^\s*-\s*/, '').trim() : bName;
+                    let q = hasQty ? num(colC) : 0;
+                    let mP = num(colE), lP = num(colG), note = str(colJ);
+
+                    if (type === 'item') {
+                        const F = num(colF), H = num(colH);
+                        xlM += F; xlL += H;
+                        if (q === 0 && (F > 0 || H > 0)) {
+                            q = 1; mP = F; lP = H;
+                            note = (note ? note + ' | ' : '') + 'เดิมจำนวน=0 (เหมา)';
+                            warns++;
+                        } else {
+                            if (Math.abs(q * mP - F) > 0.005 && q !== 0) { const o = mP; mP = F / q; adj++; note = (note ? note + ' | ' : '') + `ราคาเดิม ${o}`; }
+                            if (Math.abs(q * lP - H) > 0.005 && q !== 0) { const o = lP; lP = H / q; adj++; note = (note ? note + ' | ' : '') + `ค่าแรงเดิม ${o}`; }
+                        }
+                    }
+                    boq.push({ id: newId(), type, level, code: '', name: clean, unit: str(colD), q, mP, lP, con: '', note });
+                }
+
+                const items = boq.filter(b => b.type === 'item');
+                const calcM = items.reduce((s, i) => s + i.q * i.mP, 0);
+                const calcL = items.reduce((s, i) => s + i.q * i.lP, 0);
+                report.push({
+                    name, items: items.length, calcM, calcL,
+                    okM: Math.abs(calcM - xlM) < 1, okL: Math.abs(calcL - xlL) < 1, adj, warns,
+                });
+                plots.push({ name, group: groupName, data: { projectName: name, boq, trans: [], docs: [] } });
+            });
+
+            resolve({ plots, report });
+        } catch (err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    reader.readAsArrayBuffer(file);
+});
+
 // --- ฟังก์ชัน Import (ใช้ XLSX อ่านเหมือนเดิม เพราะเร็วกว่า) ---
 export const importFromExcel = (file, callback) => {
     const reader = new FileReader();
