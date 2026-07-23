@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'; // ใช้สำหรับ Import เหมือนเดิม
 import ExcelJS from 'exceljs'; // ใช้สำหรับ Export แบบสวยๆ
 import { saveAs } from 'file-saver';
+import { materialBudget, laborBudget } from './boqMath';
 
 // --- ฟังก์ชัน Export แบบสวยงาม (ExcelJS) ---
 export const exportToExcel = async (currentProjectData, currentProjectName) => {
@@ -74,8 +75,8 @@ export const exportToExcel = async (currentProjectData, currentProjectName) => {
             const q = parseFloat(item.q) || 0;
             const mP = parseFloat(item.mP) || 0;
             const lP = parseFloat(item.lP) || 0;
-            const mTotal = q * mP;
-            const lTotal = q * lP;
+            const mTotal = materialBudget(item);
+            const lTotal = laborBudget(item);
             const grandTotal = mTotal + lTotal;
 
             const row = ws.addRow({
@@ -171,7 +172,7 @@ export const importPlotsFromExcel = (file, groupName) => new Promise((resolve, r
                 if (rows.length < 6) return;
                 const name = sn.trim();
                 const boq = [{ id: newId(), type: 'header', level: 0, code: '', name, unit: '', q: 0, mP: 0, lP: 0, con: '', note: '' }];
-                let xlM = 0, xlL = 0, adj = 0, warns = 0;
+                let xlM = 0, xlL = 0, warns = 0;
 
                 for (let r = 5; r < rows.length; r++) {   // r=5 → แถว Excel ที่ 6
                     const row = rows[r] || [];
@@ -192,24 +193,19 @@ export const importPlotsFromExcel = (file, groupName) => new Promise((resolve, r
                     if (type === 'item') {
                         const F = num(colF), H = num(colH);
                         xlM += F; xlL += H;
-                        if (q === 0 && (F > 0 || H > 0)) {
-                            q = 1; mP = F; lP = H;
-                            note = (note ? note + ' | ' : '') + 'เดิมจำนวน=0 (เหมา)';
-                            warns++;
-                        } else {
-                            if (Math.abs(q * mP - F) > 0.005 && q !== 0) { const o = mP; mP = F / q; adj++; note = (note ? note + ' | ' : '') + `ราคาเดิม ${o}`; }
-                            if (Math.abs(q * lP - H) > 0.005 && q !== 0) { const o = lP; lP = H / q; adj++; note = (note ? note + ' | ' : '') + `ค่าแรงเดิม ${o}`; }
-                        }
+                        if (q === 0 && (F > 0 || H > 0)) warns++;
+                        boq.push({ id: newId(), type, level, code: '', name: clean, unit: str(colD), q, mP, lP, mTotal: F, lTotal: H, con: '', note });
+                        continue;
                     }
                     boq.push({ id: newId(), type, level, code: '', name: clean, unit: str(colD), q, mP, lP, con: '', note });
                 }
 
                 const items = boq.filter(b => b.type === 'item');
-                const calcM = items.reduce((s, i) => s + i.q * i.mP, 0);
-                const calcL = items.reduce((s, i) => s + i.q * i.lP, 0);
+                const calcM = items.reduce((s, i) => s + materialBudget(i), 0);
+                const calcL = items.reduce((s, i) => s + laborBudget(i), 0);
                 report.push({
                     name, items: items.length, calcM, calcL,
-                    okM: Math.abs(calcM - xlM) < 1, okL: Math.abs(calcL - xlL) < 1, adj, warns,
+                    okM: Math.abs(calcM - xlM) < 1, okL: Math.abs(calcL - xlL) < 1, adj: 0, warns,
                 });
                 plots.push({ name, group: groupName, data: { projectName: name, boq, trans: [], docs: [] } });
             });

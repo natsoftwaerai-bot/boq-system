@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { FaPlus, FaFolderPlus, FaSave, FaTrash, FaChevronDown, FaChevronRight, FaCompress, FaExpand, FaSearch, FaTimes, FaHardHat } from 'react-icons/fa';
+import { materialBudget, laborBudget, itemBudget } from '../utils/boqMath';
 
 // ── Fuzzy search helpers ──────────────────────────────────────────────────────
 const normalizeText = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -200,7 +201,14 @@ const BOQ = () => {
 
     const handleChange = (id, field, value) => {
         if (['q', 'mP', 'lP'].includes(field) && value !== '' && parseFloat(value) < 0) return;
-        setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+        setItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const next = { ...item, [field]: value };
+            // เมื่อผู้ใช้แก้จำนวน/ราคา ให้กลับไปคำนวณยอดจากค่าที่แก้ แทนยอดนำเข้าจาก Excel
+            if (field === 'q' || field === 'mP') delete next.mTotal;
+            if (field === 'q' || field === 'lP') delete next.lTotal;
+            return next;
+        }));
     };
 
     // ── Add / Delete ──────────────────────────────────────────────────────────
@@ -521,8 +529,8 @@ const BOQ = () => {
                                 const q      = safeFloat(item.q);
                                 const mP     = safeFloat(item.mP);
                                 const lP     = safeFloat(item.lP);
-                                const mTotal = q * mP;
-                                const lTotal = q * lP;
+                                const mTotal = materialBudget(item);
+                                const lTotal = laborBudget(item);
                                 const { poQty, mPaid, lPaid } = calcItem(item.id);
                                 const mRem   = mTotal - mPaid;
                                 const lRem   = lTotal - lPaid;
@@ -602,7 +610,7 @@ const BOQ = () => {
                                                         const myIdx = items.findIndex(i => i.id === item.id);
                                                         const nextHeaderIdx = items.findIndex((i, ii) => ii > myIdx && i.type === 'header' && (i.level ?? 1) <= lvl);
                                                         const sectionItems = items.slice(myIdx + 1, nextHeaderIdx === -1 ? undefined : nextHeaderIdx).filter(i => i.type === 'item');
-                                                        const sectionBudget = sectionItems.reduce((s, i) => s + safeFloat(i.q) * safeFloat(i.mP) + safeFloat(i.q) * safeFloat(i.lP), 0);
+                                                        const sectionBudget = sectionItems.reduce((s, i) => s + itemBudget(i), 0);
                                                         if (isCollapsed) {
                                                             return (
                                                                 <span className={`ml-3 flex items-center gap-2 flex-shrink-0 text-[11px] font-mono ${lvl === 0 ? 'text-slate-300' : 'text-slate-400'}`}>
@@ -706,14 +714,14 @@ const BOQ = () => {
                             {(() => {
                                 const tfMRem = items.filter(i => i.type === 'item').reduce((s, i) => {
                                     const { mPaid } = calcItem(i.id);
-                                    return s + (safeFloat(i.q) * safeFloat(i.mP)) - mPaid;
+                                    return s + materialBudget(i) - mPaid;
                                 }, 0);
                                 const tfLRem = items.filter(i => i.type === 'item').reduce((s, i) => {
                                     const { lPaid } = calcItem(i.id);
-                                    return s + (safeFloat(i.q) * safeFloat(i.lP)) - lPaid;
+                                    return s + laborBudget(i) - lPaid;
                                 }, 0);
                                 const tfTotalBudget = items.filter(i => i.type === 'item').reduce((s, i) =>
-                                    s + safeFloat(i.q) * safeFloat(i.mP) + safeFloat(i.q) * safeFloat(i.lP), 0);
+                                    s + itemBudget(i), 0);
                                 const tfTotalPaid = items.filter(i => i.type === 'item').reduce((s, i) => {
                                     const { mPaid, lPaid } = calcItem(i.id);
                                     return s + mPaid + lPaid;
@@ -727,11 +735,11 @@ const BOQ = () => {
                                         <td className="border border-slate-200" />
                                         <td className="border border-slate-200" />
                                         <td className="border border-slate-200" />
-                                        <td className="border border-slate-200 p-1 text-right font-mono text-slate-800 font-bold">{nfmt(items.reduce((s, i) => s + (safeFloat(i.q) * safeFloat(i.mP)), 0))}</td>
+                                        <td className="border border-slate-200 p-1 text-right font-mono text-slate-800 font-bold">{nfmt(items.reduce((s, i) => s + materialBudget(i), 0))}</td>
                                         <td className="border border-slate-200 p-1 text-right font-mono font-bold text-red-500">{nfmt(items.reduce((s, i) => s + calcItem(i.id).mPaid, 0))}</td>
                                         <td className={`border border-slate-200 p-1 text-right font-mono font-bold ${tfMRem < 0 ? 'text-red-500' : 'text-green-600'}`}>{nfmt(tfMRem)}</td>
                                         <td className="border border-slate-200" />
-                                        <td className="border border-slate-200 p-1 text-right font-mono text-slate-800 font-bold">{nfmt(items.reduce((s, i) => s + (safeFloat(i.q) * safeFloat(i.lP)), 0))}</td>
+                                        <td className="border border-slate-200 p-1 text-right font-mono text-slate-800 font-bold">{nfmt(items.reduce((s, i) => s + laborBudget(i), 0))}</td>
                                         <td className="border border-slate-200 p-1 text-right font-mono font-bold text-red-500">{nfmt(items.reduce((s, i) => s + calcItem(i.id).lPaid, 0))}</td>
                                         <td className={`border border-slate-200 p-1 text-right font-mono font-bold ${tfLRem < 0 ? 'text-red-500' : 'text-green-600'}`}>{nfmt(tfLRem)}</td>
                                         <td className={`border border-slate-200 p-1 text-center text-[11px] font-bold ${tfPercent >= 100 ? 'text-green-600' : tfPercent >= 80 ? 'text-orange-500' : tfPercent > 0 ? 'text-slate-600' : 'text-slate-300'}`}>

@@ -65,7 +65,6 @@ function parseSheet(ws) {
 
     // เก็บแถวสรุปท้าย sheet ไว้เทียบยอด (ไม่ import) + รายการที่ปรับราคา
     let statedM = null, statedL = null;
-    const adjusted = [];
     const warnings = [];
 
     ws.eachRow((row, rowNum) => {
@@ -111,29 +110,13 @@ function parseSheet(ws) {
         let   note = toStr(colJ);
 
         if (type === 'item') {
-            // ยอดเงินจริงใน Excel — ถ้าสูตรไม่ใช่ q×ราคา (เช่น เหล็กเส้น ตัน↔เส้น)
-            // ให้ปรับราคา/หน่วยเป็น ยอดเงิน÷จำนวน เพื่อให้ยอดตรง Excel เป๊ะ (จำนวนคงเดิม)
             const F = colF != null ? toNum(colF) : null;
             const H = colH != null ? toNum(colH) : null;
-            if (F != null && Math.abs(q * mP - F) > 0.005) {
-                if (q !== 0) {
-                    const oldP = mP;
-                    mP = F / q;
-                    note = note ? `${note} | ราคาเดิม ${oldP} บาท/เส้น` : `ราคาเดิม ${oldP} บาท/เส้น`;
-                    adjusted.push(`${cleanName.substring(0, 45)} (วัสดุ ${oldP} → ${mP.toFixed(2)}/${toStr(colD)})`);
-                } else if (F !== 0) {
+            if (F != null && q === 0 && F !== 0) {
                     warnings.push(`แถว ${rowNum}: "${cleanName.substring(0, 40)}" จำนวน=0 แต่ยอดวัสดุ=${F} — เก็บตามหน้าตาราง`);
-                }
             }
-            if (H != null && Math.abs(q * lP - H) > 0.005) {
-                if (q !== 0) {
-                    const oldP = lP;
-                    lP = H / q;
-                    note = note ? `${note} | ค่าแรงเดิม ${oldP}` : `ค่าแรงเดิม ${oldP}`;
-                    adjusted.push(`${cleanName.substring(0, 45)} (ค่าแรง ${oldP} → ${lP.toFixed(2)}/${toStr(colD)})`);
-                } else if (H !== 0) {
+            if (H != null && q === 0 && H !== 0) {
                     warnings.push(`แถว ${rowNum}: "${cleanName.substring(0, 40)}" จำนวน=0 แต่ยอดค่าแรง=${H} — เก็บตามหน้าตาราง`);
-                }
             }
         }
 
@@ -143,12 +126,13 @@ function parseSheet(ws) {
             name: cleanName,
             unit: toStr(colD),
             q, mP, lP,
+            ...(type === 'item' ? { mTotal: colF != null ? toNum(colF) : q * mP, lTotal: colH != null ? toNum(colH) : q * lP } : {}),
             con: '',
             note,
         });
     });
 
-    return { plotName, boq, statedM, statedL, adjusted, warnings };
+    return { plotName, boq, statedM, statedL, warnings };
 }
 
 // ── main ────────────────────────────────────────────────────────────────────
@@ -164,10 +148,10 @@ async function main() {
         if (SKIP_SHEETS.includes(nameTrim)) { console.log(`   ⏭  ข้าม sheet "${nameTrim}" (ไม่ใช่ BOQ)`); continue; }
         if (ws.rowCount < 6) continue;
 
-        const { plotName, boq, statedM, statedL, adjusted, warnings } = parseSheet(ws);
+        const { plotName, boq, statedM, statedL, warnings } = parseSheet(ws);
         const items = boq.filter(r => r.type === 'item');
-        const calcM = items.reduce((s, i) => s + i.q * i.mP, 0);
-        const calcL = items.reduce((s, i) => s + i.q * i.lP, 0);
+        const calcM = items.reduce((s, i) => s + (i.mTotal ?? i.q * i.mP), 0);
+        const calcL = items.reduce((s, i) => s + (i.lTotal ?? i.q * i.lP), 0);
 
         const dM = statedM != null ? calcM - statedM : null;
         const dL = statedL != null ? calcL - statedL : null;
@@ -176,8 +160,6 @@ async function main() {
 
         console.log(`   📋 ${plotName}`);
         console.log(`      items: ${items.length} | วัสดุ: ${fmt(calcM)} [${okM}] | ค่าแรง: ${fmt(calcL)} [${okL}]`);
-        if (adjusted.length) console.log(`      ⚙ ปรับราคา/หน่วยให้ยอดตรง Excel: ${adjusted.length} รายการ`);
-        adjusted.forEach(a => console.log(`         · ${a}`));
         warnings.forEach(w => console.log(`      ⚠ ${w}`));
 
         if (dM != null && Math.abs(dM) >= 0.01 || dL != null && Math.abs(dL) >= 0.01) {

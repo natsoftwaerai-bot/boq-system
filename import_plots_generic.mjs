@@ -3,7 +3,7 @@
  * Usage: node import_plots_generic.mjs "<file.xlsx>" "<ชื่อโครงการ>" "<dev password>" [--dry-run]
  *
  * - อ่านไฟล์อย่างเดียว ไม่แก้ Excel
- * - ปรับราคา/หน่วยให้ยอดเงินตรง Excel เป๊ะ (กรณีสูตรไม่ใช่ q×ราคา เช่น เหล็กเส้น ตัน↔เส้น)
+ * - เก็บราคา/หน่วยและยอดเงินตาม Excel แยกกัน เพื่อไม่บิดราคาต้นทาง
  * - ตรวจยอด: ผลรวมรายการ = ผลรวมของแถว subtotal ทุกหมวด (รวมค่างาน...)
  * - สำรองข้อมูลก่อนเขียน, เพิ่มแปลงใหม่ทั้งหมด ไม่แตะของเดิม
  */
@@ -49,7 +49,7 @@ function parseSheet(ws) {
     const plotName = ws.name.trim();
     const boq = [{ id: newId(), type: 'header', level: 0, code: '', name: plotName, unit: '', q: 0, mP: 0, lP: 0, con: '', note: '' }];
     let xlM = 0, xlL = 0;          // ผลรวมช่องเงินของ "รายการ" ตาม Excel (F/H) — ใช้ cross-check
-    const adjusted = [], warnings = [];
+    const warnings = [];
 
     ws.eachRow((row, rowNum) => {
         if (rowNum < 6) return;
@@ -81,21 +81,17 @@ function parseSheet(ws) {
             const H = colH != null ? toNum(colH) : 0;
             xlM += F; xlL += H;
 
-            // แถวมีเงินแต่จำนวน=0 → ตั้ง q=1 แล้วเก็บเงินไว้เป็นราคา (เงินจะแสดงถูกในระบบ)
+            // เก็บจำนวน ราคา/หน่วย และยอดเงินตาม Excel โดยไม่ดัดแปลง
             if (q === 0 && (F > 0 || H > 0)) {
-                q = 1; mP = F; lP = H;
-                note = note ? `${note} | เดิมจำนวน=0 (เหมา)` : 'เดิมจำนวน=0 (เหมา)';
-                warnings.push(`แถว ${rowNum} "${cleanName.slice(0,30)}" จำนวน=0 → ตั้งเป็นเหมา 1 หน่วย (วัสดุ ${F}, ค่าแรง ${H})`);
-            } else {
-                // ปรับราคา/หน่วยให้ q×ราคา = เงินใน Excel เป๊ะ
-                if (Math.abs(q * mP - F) > 0.005 && q !== 0) { const o = mP; mP = F / q; adjusted.push(`${cleanName.slice(0,38)} (วัสดุ ${o}→${mP.toFixed(2)})`); note = note ? `${note} | ราคาเดิม ${o}` : `ราคาเดิม ${o}`; }
-                if (Math.abs(q * lP - H) > 0.005 && q !== 0) { const o = lP; lP = H / q; adjusted.push(`${cleanName.slice(0,38)} (ค่าแรง ${o}→${lP.toFixed(2)})`); note = note ? `${note} | ค่าแรงเดิม ${o}` : `ค่าแรงเดิม ${o}`; }
+                warnings.push(`แถว ${rowNum} "${cleanName.slice(0,30)}" จำนวน=0 แต่มียอดเงิน — เก็บค่าตาม Excel`);
             }
+            boq.push({ id: newId(), type, level, code: '', name: cleanName, unit: toStr(colD), q, mP, lP, mTotal: F, lTotal: H, con: '', note });
+            return;
         }
         boq.push({ id: newId(), type, level, code: '', name: cleanName, unit: toStr(colD), q, mP, lP, con: '', note });
     });
 
-    return { plotName, boq, xlM, xlL, adjusted, warnings };
+    return { plotName, boq, xlM, xlL, warnings };
 }
 
 async function main() {
@@ -108,14 +104,13 @@ async function main() {
     console.log('\n── ตรวจสอบยอด (ผลรวมในระบบ vs ผลรวมช่องเงินของรายการใน Excel) ──');
     for (const ws of wb.worksheets) {
         if (ws.rowCount < 6) continue;
-        const { plotName, boq, xlM, xlL, adjusted, warnings } = parseSheet(ws);
+        const { plotName, boq, xlM, xlL, warnings } = parseSheet(ws);
         const items = boq.filter(r => r.type === 'item');
-        const calcM = items.reduce((s, i) => s + i.q * i.mP, 0);
-        const calcL = items.reduce((s, i) => s + i.q * i.lP, 0);
+        const calcM = items.reduce((s, i) => s + (i.mTotal ?? i.q * i.mP), 0);
+        const calcL = items.reduce((s, i) => s + (i.lTotal ?? i.q * i.lP), 0);
         const okM = Math.abs(calcM - xlM) < 1 ? '✓' : `✗ ต่าง ${fmt(calcM - xlM)}`;
         const okL = Math.abs(calcL - xlL) < 1 ? '✓' : `✗ ต่าง ${fmt(calcL - xlL)}`;
         console.log(`   📋 ${plotName}: items=${items.length} | วัสดุ ${fmt(calcM)} [${okM}] | ค่าแรง ${fmt(calcL)} [${okL}]`);
-        if (adjusted.length) console.log(`      ⚙ ปรับราคา/หน่วย ${adjusted.length} รายการ (ยอดเงินเท่าเดิม)`);
         warnings.forEach(w => console.log(`      ⚠ ${w}`));
         if (okM.startsWith('✗') || okL.startsWith('✗')) bad = true;
         plots.push({ name: plotName, group: GROUP_NAME, data: { projectName: plotName, boq, trans: [], docs: [] } });

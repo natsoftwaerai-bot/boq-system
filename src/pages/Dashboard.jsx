@@ -5,6 +5,7 @@ import {
     BarElement, Tooltip, Legend
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import { materialBudget, laborBudget } from '../utils/boqMath';
 import {
     FaCheckSquare, FaRegSquare, FaChevronDown, FaChevronUp,
     FaBoxOpen, FaFileInvoiceDollar, FaHardHat, FaCheckCircle,
@@ -39,9 +40,8 @@ const getStats = (projectData = {}) => {
     let mBudget = 0, mPaid = 0, lBudget = 0, lPaid = 0;
     (projectData.boq || []).forEach(item => {
         if (item.type === 'item') {
-            const q = parseFloat(item.q) || 0;
-            mBudget += q * (parseFloat(item.mP) || 0);
-            lBudget += q * (parseFloat(item.lP) || 0);
+            mBudget += materialBudget(item);
+            lBudget += laborBudget(item);
         }
     });
     (projectData.trans || []).forEach(t => {

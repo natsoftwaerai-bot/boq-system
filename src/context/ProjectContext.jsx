@@ -163,6 +163,7 @@ export const ProjectProvider = ({ children }) => {
         } catch (e) {
             console.error("Firebase Write Error: ", e);
             alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + e.message);
+            throw e;
         }
     };
 
