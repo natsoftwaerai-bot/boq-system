@@ -80,7 +80,7 @@ async function readSource(source) {
                 mP: number(row[4]),
                 mTotal: number(row[5]),
                 lP: number(row[6]),
-                lTotal: number(row[7]),
+                lTotal: number(rawQty) * number(row[6]),
             });
         }
 

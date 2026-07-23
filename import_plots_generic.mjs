@@ -85,7 +85,7 @@ function parseSheet(ws) {
             if (q === 0 && (F > 0 || H > 0)) {
                 warnings.push(`แถว ${rowNum} "${cleanName.slice(0,30)}" จำนวน=0 แต่มียอดเงิน — เก็บค่าตาม Excel`);
             }
-            boq.push({ id: newId(), type, level, code: '', name: cleanName, unit: toStr(colD), q, mP, lP, mTotal: F, lTotal: H, con: '', note });
+            boq.push({ id: newId(), type, level, code: '', name: cleanName, unit: toStr(colD), q, mP, lP, mTotal: F, lTotal: q * lP, con: '', note });
             return;
         }
         boq.push({ id: newId(), type, level, code: '', name: cleanName, unit: toStr(colD), q, mP, lP, con: '', note });

@@ -226,8 +226,12 @@ const PO = ({ setActivePage }) => {
             let next = i;
             const cLp = parseFloat(c.lPrice) || 0;
             const cMp = parseFloat(c.mPrice) || 0;
-            if ((parseFloat(next.lP) || 0) <= 0 && cLp > 0) next = { ...next, lP: cLp };
-            if ((parseFloat(next.mP) || 0) <= 0 && cMp > 0) next = { ...next, mP: cMp };
+            if ((parseFloat(next.lP) || 0) <= 0 && cLp > 0) {
+                next = { ...next, lP: cLp, lTotal: (parseFloat(next.q) || 0) * cLp };
+            }
+            if ((parseFloat(next.mP) || 0) <= 0 && cMp > 0) {
+                next = { ...next, mP: cMp, mTotal: (parseFloat(next.q) || 0) * cMp };
+            }
             if (!next.con && (parseFloat(next.lP) || 0) > 0) next = { ...next, con: contractor.trim() };
             return next;
         });

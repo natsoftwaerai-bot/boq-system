@@ -4,17 +4,14 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { readFileSync } from 'fs';
+import { firebaseNodeConfig } from './firebase-node-config.mjs';
 
 const PASSWORD = process.argv[2];
 const GROUP = process.argv[3];
 const MERGE = process.argv.includes('--merge');
 if (!PASSWORD || !GROUP) { console.error('Usage: node push_plots.mjs "<password>" "<group>" [--merge]'); process.exit(1); }
 
-const app = initializeApp({
-    apiKey: 'AIzaSyDST4qYOlsdVUVjXL7KiMJtz2GXXCtEwTI',
-    authDomain: 'boq-system-react.firebaseapp.com',
-    projectId: 'boq-system-react',
-});
+const app = initializeApp(firebaseNodeConfig);
 const sanitize = v => JSON.parse(JSON.stringify(v, (_, x) => x === undefined ? null : x));
 
 const plots = JSON.parse(readFileSync('_import_plots.json', 'utf8'));

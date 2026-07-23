@@ -194,7 +194,7 @@ export const importPlotsFromExcel = (file, groupName) => new Promise((resolve, r
                         const F = num(colF), H = num(colH);
                         xlM += F; xlL += H;
                         if (q === 0 && (F > 0 || H > 0)) warns++;
-                        boq.push({ id: newId(), type, level, code: '', name: clean, unit: str(colD), q, mP, lP, mTotal: F, lTotal: H, con: '', note });
+                        boq.push({ id: newId(), type, level, code: '', name: clean, unit: str(colD), q, mP, lP, mTotal: F, lTotal: q * lP, con: '', note });
                         continue;
                     }
                     boq.push({ id: newId(), type, level, code: '', name: clean, unit: str(colD), q, mP, lP, con: '', note });

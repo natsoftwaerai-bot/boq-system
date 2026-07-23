@@ -126,7 +126,7 @@ function parseSheet(ws) {
             name: cleanName,
             unit: toStr(colD),
             q, mP, lP,
-            ...(type === 'item' ? { mTotal: colF != null ? toNum(colF) : q * mP, lTotal: colH != null ? toNum(colH) : q * lP } : {}),
+            ...(type === 'item' ? { mTotal: colF != null ? toNum(colF) : q * mP, lTotal: q * lP } : {}),
             con: '',
             note,
         });

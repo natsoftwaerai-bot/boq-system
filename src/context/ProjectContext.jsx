@@ -546,8 +546,12 @@ export const ProjectProvider = ({ children }) => {
             let next = i;
             const cLp = parseFloat(c.lPrice) || 0;
             const cMp = parseFloat(c.mPrice) || 0;
-            if ((parseFloat(next.lP) || 0) <= 0 && cLp > 0) next = { ...next, lP: cLp };
-            if ((parseFloat(next.mP) || 0) <= 0 && cMp > 0) next = { ...next, mP: cMp };
+            if ((parseFloat(next.lP) || 0) <= 0 && cLp > 0) {
+                next = { ...next, lP: cLp, lTotal: (parseFloat(next.q) || 0) * cLp };
+            }
+            if ((parseFloat(next.mP) || 0) <= 0 && cMp > 0) {
+                next = { ...next, mP: cMp, mTotal: (parseFloat(next.q) || 0) * cMp };
+            }
             if (!next.con && (parseFloat(next.lP) || 0) > 0) next = { ...next, con: contractor.trim() };
             return next;
         });
@@ -578,7 +582,9 @@ export const ProjectProvider = ({ children }) => {
         const paidIds = new Set(items.map(i => i.id));
         const newBoq = (data.boq || []).map(i => {
             let next = i;
-            if (lpFixes[i.id]) next = { ...next, lP: lpFixes[i.id] };
+            if (lpFixes[i.id]) {
+                next = { ...next, lP: lpFixes[i.id], lTotal: (parseFloat(i.q) || 0) * lpFixes[i.id] };
+            }
             if (stampCon && paidIds.has(i.id)) next = { ...next, con: payee };
             return next;
         });

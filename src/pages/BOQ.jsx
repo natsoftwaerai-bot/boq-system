@@ -69,7 +69,7 @@ const PriceCell = ({ value, onCommit, readOnly, fmt }) => {
 
 const BOQ = () => {
     const { currentProjectData, updateProjectData, createBackup, currentProjectName, user } = useProject();
-    const [items, setItems] = useState([]);
+    const [items, setItems] = useState(() => currentProjectData?.boq || []);
     const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'unsaved' | 'saving'
     const [selectedHeaderId, setSelectedHeaderId] = useState('');
     const [collapsedSections, setCollapsedSections] = useState(new Set());
@@ -148,6 +148,7 @@ const BOQ = () => {
     // ── Auto-save ─────────────────────────────────────────────────────────────
     const autoSaveTimer = useRef(null);
     const isSyncingFromFirebase = useRef(false);
+    const userChangedItems = useRef(false);
     const latestProjectData = useRef(currentProjectData);
 
     useEffect(() => {
@@ -166,6 +167,8 @@ const BOQ = () => {
             isSyncingFromFirebase.current = false;
             return;
         }
+        if (!userChangedItems.current) return;
+        userChangedItems.current = false;
         setSaveStatus('unsaved');
         if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
         autoSaveTimer.current = setTimeout(async () => {
@@ -201,6 +204,7 @@ const BOQ = () => {
 
     const handleChange = (id, field, value) => {
         if (['q', 'mP', 'lP'].includes(field) && value !== '' && parseFloat(value) < 0) return;
+        userChangedItems.current = true;
         setItems(prev => prev.map(item => {
             if (item.id !== id) return item;
             const next = { ...item, [field]: value };
@@ -222,6 +226,7 @@ const BOQ = () => {
         });
         const nextCode = String(max + 1).padStart(2, '0');
         const newId = Date.now();
+        userChangedItems.current = true;
         setItems([...items, { id: newId, type: 'header', code: nextCode, name: 'หมวดงานใหม่' }]);
         setSelectedHeaderId(newId);
     };
@@ -244,11 +249,13 @@ const BOQ = () => {
         };
         const newItems = [...items];
         newItems.splice(insertIndex, 0, newItem);
+        userChangedItems.current = true;
         setItems(newItems);
     };
 
     const handleDelete = (id) => {
         if (confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) {
+            userChangedItems.current = true;
             setItems(prev => prev.filter(i => i.id !== id));
             if (id == selectedHeaderId) setSelectedHeaderId('');
         }
@@ -269,6 +276,7 @@ const BOQ = () => {
         );
         if (name === null) return;
         const ids = new Set(targets.map(t => t.id));
+        userChangedItems.current = true;
         setItems(prev => prev.map(i => ids.has(i.id) ? { ...i, con: name.trim() } : i));
     };
 

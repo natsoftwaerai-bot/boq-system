@@ -205,7 +205,9 @@ const DV = ({ setActivePage }) => {
             const paidIds = new Set(itemsToPay.map(i => i.id));
             const newBoq = (currentProjectData.boq || []).map(i => {
                 let next = i;
-                if (lpFixes[i.id]) next = { ...next, lP: lpFixes[i.id] };
+                if (lpFixes[i.id]) {
+                    next = { ...next, lP: lpFixes[i.id], lTotal: (parseFloat(i.q) || 0) * lpFixes[i.id] };
+                }
                 if (isNewMode && paidIds.has(i.id)) next = { ...next, con: payeeName };
                 return next;
             });
